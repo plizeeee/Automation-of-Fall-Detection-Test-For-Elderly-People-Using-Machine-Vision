@@ -1,0 +1,16 @@
+version: '3'
+services:
+  testbed:
+    build:
+      context: .
+      dockerfile: Dockerfile_combo
+    image: combo
+    volumes:
+      - /RemoteDockerFiles/PatrickWorkstation/AutomatedTUGTest/:/opt/project/
+      - /RemoteDockerFiles/PatrickWorkstation/AutomatedTUGTest/included_files/:/included_files/
+      - /RemoteDockerFiles/PatrickWorkstation/AutomatedTUGTest/output/:/output/
+
+    # to gain access to terminal
+#    entrypoint: /bin/sh
+#    stdin_open: true
+#    tty: true

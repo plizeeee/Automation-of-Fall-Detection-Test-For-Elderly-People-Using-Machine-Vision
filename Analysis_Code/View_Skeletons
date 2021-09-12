@@ -1,0 +1,729 @@
+clear
+clc
+close all
+subject_id = 5
+trial_number = 4
+frame_rate = 895/31
+% frame_rate = 28
+% framenum = round(frame_rate*18.3) % Plot pose of this frame
+framenum = 550
+%%%%%
+img = imread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number), '/frame/frame', num2str(framenum),'.jpg']);
+cropped_im = imread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number), '/frame/cropped_im',num2str(framenum),'.jpg']);
+keypts2D = csvread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number),'/2dpose.csv'])
+bboxes = csvread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number),'/bboxes.csv'])
+keypts_1Darr = csvread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number),'/rgb_skeleton.csv'])
+keypts_1Darr_stage6_vid = csvread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number),'/rgb_skeleton.csv'])
+
+% 
+% img = imread(['output/frame/frame2', num2str(framenum),'.jpg']);
+% cropped_im = imread(['output/frame/cropped_im2',num2str(framenum),'.jpg']);
+% keypts2D = csvread('output/2dpose2.csv')
+% bboxes = csvread('output/bboxes2.csv')
+% keypts_1Darr = csvread('output/data32.csv')
+% keypts_1Darr_stage6_vid = csvread('output/data32.csv')
+
+
+
+
+predictions = cell(1,1)
+for i = 1:6
+    pose3D{i} = reshape(keypts_1Darr(i,:), [17,3]);
+end
+
+
+% pose for all frames
+n = size(keypts_1Darr_stage6_vid,1)
+vidpos3D = cell(1,n)
+for i = 1:n
+    vidpos3D{i} = reshape(keypts_1Darr_stage6_vid(i,:), [17,3]);
+end
+
+skel_vid_frame = vidpos3D{framenum}
+% 
+%  figure;
+%     % image used for testing
+%     imshow(img);
+%     title('Test Image');
+%     figure;
+%     % Estimated 3D poses corresponding to each stage (1 - 6)
+%     set(gcf, 'Position', get(0,'Screensize'));
+%     for i = 1 : 6
+%         subplot(2, 3, i);
+%         plotSkel3D(pose3D{i}, 'r');
+%         title(sprintf('Pose 3D prediction - stage %d', i));
+%     end
+%     
+
+
+%%%%
+figure(4)
+
+imshow(img)
+hold on
+plot(keypts2D(1,framenum), keypts2D(2,framenum), 'ok', 'LineWidth', 2, 'MarkerSize', 5);
+plot((keypts2D(3,framenum)+keypts2D(5,framenum))/2, (keypts2D(4,framenum)+keypts2D(6,framenum))/2, 'ow', 'LineWidth', 2, 'MarkerSize', 5);
+for i = 4:11
+    plot(keypts2D(2*i-1,framenum), keypts2D(2*i,framenum), 'o', 'LineWidth', 2, 'MarkerSize', 5);
+end
+legend('nose', 'pelvis', 'left wrist', 'right wrist', 'left shoulder', 'right shoulder', 'left knee', 'right knee', 'left ankle', 'right ankle')
+
+figure(5)
+plotSkel3D( pose3D{6}, 'r' )
+figure(6)
+imshow(cropped_im)
+figure(7)
+plotSkel3D(skel_vid_frame, 'r' )
+frame_diff = 0;
+ind1 = 280;
+ind2 = ind1+frame_diff;
+
+%%
+f = 100; % Focal lenth of camera
+
+pxy = cell(1,10);
+kxy = cell(1,10);
+
+% 1) Pelvis
+pxy{1} = [vidpos3D{ind1}(1,1);vidpos3D{ind1}(1,3)];
+% take pelvis as mean of left and right hip
+kxy{1} = [(keypts2D(3,ind2)+keypts2D(5,ind2))/2;(keypts2D(4,ind2)+keypts2D(6,ind2))/2];
+
+% 2) Left Knee
+pxy{2} = [vidpos3D{ind1}(3,1);vidpos3D{ind1}(3,3)];
+kxy{2} = [keypts2D(15,ind2);keypts2D(16,ind2)];
+
+% 3) Left Ankle
+pxy{3} = [vidpos3D{ind1}(4,1);vidpos3D{ind1}(4,3)];
+kxy{3} = [keypts2D(19,ind2);keypts2D(20,ind2)];
+
+% 4) Right Knee
+pxy{4} = [vidpos3D{ind1}(6,1);vidpos3D{ind1}(6,3)];
+kxy{4} = [keypts2D(17,ind2);keypts2D(18,ind2)];
+
+% 5) Right Ankle
+pxy{5} = [vidpos3D{ind1}(7,1);vidpos3D{ind1}(7,3)];
+kxy{5} = [keypts2D(21,ind2);keypts2D(22,ind2)];
+
+% 6) Nose
+% try nose as mid neck
+pxy{6} = [vidpos3D{ind1}(11,1);vidpos3D{ind1}(11,3)];
+kxy{6} = [keypts2D(1,ind2);keypts2D(2,ind2)];
+
+% 7) Right Shoulder
+pxy{7} = [vidpos3D{ind1}(12,1);vidpos3D{ind1}(12,3)];
+kxy{7} = [keypts2D(13,ind2);keypts2D(14,ind2)];
+
+% 8) Right Wrist
+pxy{8} = [vidpos3D{ind1}(14,1);vidpos3D{ind1}(14,3)];
+kxy{8} = [keypts2D(9,ind2);keypts2D(10,ind2)];
+
+% 9) Left Shoulder
+pxy{9} = [vidpos3D{ind1}(15,1);vidpos3D{ind1}(15,3)];
+kxy{9} = [keypts2D(11,ind2);keypts2D(12,ind2)];
+
+% 10) Left Wrist
+pxy{10} = [vidpos3D{ind1}(17,1);vidpos3D{ind1}(17,3)];
+kxy{10} = [keypts2D(7,ind2);keypts2D(8,ind2)];
+% 
+% for i = 1:10
+% disp(['Pxy = ', num2str(pxy{i}(1)),',', num2str(pxy{i}(2))])
+% disp(['Kxy = ', num2str(kxy{i}(1)),',', num2str(kxy{i}(2))])
+% disp(i)
+% disp('-----')
+% end
+
+tot_pxy = pxy{1};
+tot_kxy = kxy{1};
+for i = 2:10
+    tot_pxy = pxy{i} + tot_pxy;
+    tot_kxy = kxy{i} + tot_kxy;
+end
+mean_pxy = tot_pxy/10;
+mean_kxy = tot_kxy/10;
+
+squaremagpxy_sum = 0;
+squaremagkxy_sum = 0;
+for i = 1:10
+    % numerator
+    pxnormalized = pxy{i}(1)-mean_pxy(1);
+    pynormalized = pxy{i}(2)-mean_pxy(2);
+    squaremagpxy_temp = pxnormalized^2 + pynormalized^2;
+    squaremagpxy_sum = squaremagpxy_sum + squaremagpxy_temp  ;  
+    
+    % denominator
+    kxnormalized = kxy{i}(1)-mean_kxy(1);
+    kynormalized = kxy{i}(2)-mean_kxy(2);
+    squaremagkxy_temp = kxnormalized^2 + kynormalized^2;
+    squaremagkxy_sum = squaremagkxy_sum + squaremagkxy_temp ;   
+    
+end
+
+numerator = sqrt(squaremagpxy_sum);
+denominator = sqrt(squaremagkxy_sum);
+
+z = f*numerator/denominator;
+y = mean_kxy(2)*z/f-mean_pxy(2);
+x = mean_kxy(1)*z/f-mean_pxy(1);
+translation_frame = [x,z,y]
+
+
+%%
+frame_keypts3D = vidpos3D{ind1}
+frame_keypts2D = keypts2D(:,ind2)
+reference_frame = global_vals(frame_keypts3D,frame_keypts2D)
+%%
+reference_frame = cell(1,n)
+rot_mat = cell(1,n)
+frame_keypts2D = cell(1,n)
+frame_keypts3D = cell(1,n)
+projerror_rot = zeros(2,n)
+projerror_no_rot = zeros(2,n)
+
+
+%%%%
+im_dims = size(img)
+% im_dims = [1080,1920,3];
+for ind1 = 1:n
+    ind2 = ind1+frame_diff;
+    frame_keypts3D{ind1} = vidpos3D{ind1};
+    frame_keypts2D{ind1} = keypts2D(:,ind2);
+    [reference_frame{ind1},rot_mat{ind1},projerror_no_rot(:,ind1),projerror_rot(:,ind1)] = global_vals(frame_keypts3D{ind1},frame_keypts2D{ind1},im_dims,bboxes(:,ind1));
+    
+    for i = 1:17
+        skel_vid_frame_new(i,:) = (rot_mat{ind1}*(frame_keypts3D{ind1}(i,:)+reference_frame{ind1})')';
+    end
+    vid_global_skeletons{ind1} = skel_vid_frame_new;
+end
+
+% Projection error to show goodness of fit
+mean_proj_error_no_rot(1) = mean(abs(projerror_no_rot(1,200:end)));
+mean_proj_error_no_rot(2) = mean(abs(projerror_no_rot(2,200:end)));
+mean_proj_error_rot(1) = mean(abs(projerror_rot(1,:)));
+mean_proj_error_rot(2) = mean(abs(projerror_rot(2,:)));
+disp('results:')
+disp(mean_proj_error_no_rot)
+disp(mean_proj_error_rot)
+
+%%
+reference_frame = cell(1,n)
+rot_mat = cell(1,n)
+frame_keypts2D = cell(1,n)
+frame_keypts3D = cell(1,n)
+projerror_rot = zeros(2,n)
+projerror_no_rot = zeros(2,n)
+
+
+%%%%
+im_dims = size(img)
+ind1 = 1
+ind2 = ind1+frame_diff
+frame_keypts3D{ind1} = vidpos3D{ind1};
+frame_keypts2D{ind1} = keypts2D(:,ind2);
+[reference_frame{ind1},projerror_rot(:,ind1)] = global_vals2(frame_keypts3D{ind1},frame_keypts2D{ind1});
+z = reference_frame{ind1}(3)
+vid_global_skeletons{ind1} = frame_keypts3D{ind1};
+for ind1 = 2:n
+    ind2 = ind1+frame_diff;
+    rotated_vals = rotate_fov(im_dims(2),bboxes(:,ind1),z)
+    frame_keypts3D{ind1} = vidpos3D{ind1};
+    for kk = 1:17
+       frame_keypts3D{ind1}(kk,:) =  (rotated_vals*frame_keypts3D{ind1}(kk,:)')';
+    end
+    frame_keypts2D{ind1} = keypts2D(:,ind2);
+    
+    [reference_frame{ind1},projerror_rot(:,ind1)] = global_vals2(frame_keypts3D{ind1},frame_keypts2D{ind1});
+    z = reference_frame{ind1}(3)
+    for i = 1:17
+        skel_vid_frame_new(i,:) = (frame_keypts3D{ind1}(i,:)+reference_frame{ind1});
+    end
+    vid_global_skeletons{ind1} = skel_vid_frame_new;
+end
+
+% Projection error to show goodness of fit
+mean_proj_error_rot(1) = mean(abs(projerror_rot(1,200:end)));
+mean_proj_error_rot(2) = mean(abs(projerror_rot(2,200:end)));
+disp('results:')
+disp(mean_proj_error_no_rot)
+disp(mean_proj_error_rot)
+
+%%
+% close all
+for i = 1:n
+    maxvalx(i) = max(vid_global_skeletons{i}(:,1))
+    minvalx(i) = min(vid_global_skeletons{i}(:,1))
+    maxvaly(i) = max(vid_global_skeletons{i}(:,3))
+    minvaly(i) = min(vid_global_skeletons{i}(:,3))
+    maxvalz(i) = max(-vid_global_skeletons{i}(:,2))
+    minvalz(i) = min(-vid_global_skeletons{i}(:,2))
+    
+end
+minvalx_tot = min(minvalx)
+maxvalx_tot = max(maxvalx)
+minvaly_tot = min(minvaly)
+maxvaly_tot = max(maxvaly)
+minvalz_tot = min(minvalz)
+maxvalz_tot = max(maxvalz)
+
+
+for i = 1:n  
+    
+if i< 38
+   color_val = 'r';
+end
+if i>= 38 && i <100
+   color_val = 'y';
+end
+if i>100 && i<200
+   color_val = 'g';
+end
+if i>200
+   color_val = 'b';
+end
+figure_handle = figure(9);
+hold off
+plotSkel3D_global(vid_global_skeletons{i}, color_val,[minvalx_tot,maxvalx_tot],[minvaly_tot,maxvaly_tot],[minvalz_tot,maxvalz_tot]);
+% plotSkel3D(vid_global_skeletons{i}, color_val);
+pause(0.1);
+ 
+end
+
+%%
+
+for i = 1:n
+    % Relative positions
+    yplotvals_height(i) = vid_global_skeletons{i}(1,2);
+%     yplotvals_height(i) = vidpos3D{i}(11,2)-(vidpos3D{i}(4,2)+vidpos3D{i}(7,2))/2;
+    xplotvals_lefts(i) = vidpos3D{i}(13,1);
+    xplotvals_rights(i) = vidpos3D{i}(16,1);
+    zplotvals_feet_diff(i) = (vidpos3D{i}(4,3)-vidpos3D{i}(7,3))/2;
+%     yplotvals_pelvis(i) = vid_global_skeletons{i}(1,2)
+
+    % Checking if hips are parralel to knees for when they sit back down
+    yplotvals_hip_knee_absdiff(i) = abs(vidpos3D{i}(2,2)-vidpos3D{i}(3,2))+abs(vidpos3D{i}(5,2)-vidpos3D{i}(6,2))
+    % The z value is actually the depth of the image, it's just represented differently for the pinhole camera model 
+    % Hip gloval y pos over time
+    zplotvals_pelvis_global(i) = vid_global_skeletons{i}(1,3);
+end
+zplotvals_pelvis_global_smooth = smoothdata(zplotvals_pelvis_global,'movmedian',8);
+yplotvals_height_smooth = smoothdata(yplotvals_height,'movmedian',8);
+
+
+
+figure(10)
+plot(0:1/frame_rate:(n-1)/frame_rate,yplotvals_height)
+
+figure(15)
+plot(0:1/frame_rate:(n-1)/frame_rate,xplotvals_lefts)
+figure(16)
+plot(0:1/frame_rate:(n-1)/frame_rate,xplotvals_rights)
+figure(17)
+plot(0:1/frame_rate:(n-1)/frame_rate,zplotvals_pelvis_global_smooth)
+figure(18)
+plot(0:1/frame_rate:(n-1)/frame_rate,zplotvals_feet_diff)
+figure(100)
+plot(0:1/frame_rate:(n-1)/frame_rate,yplotvals_hip_knee_absdiff)
+%% Segmenting test with RGB results
+% TF = find(islocalmin(C)==1)
+% Display frames of different parts of the test.
+num = 13; % +- num frames displayed
+ptime = 0.1
+m = 300 % Start frame (start will normally just be the first frame of the video, since user will be seated
+% stand_up_ind_rgb = mymin(yplotvals_height(m:end), 400, 10) +m-1
+stand_up_ind_rgb  =mymin(yplotvals_height_smooth(m:end), 400, 10) +m-1
+
+reach_line_ind_rgb = mymin(zplotvals_pelvis_global_smooth(stand_up_ind_rgb:end),2500,8)+stand_up_ind_rgb-1
+
+turn_complete_ind_rgb = round((mymin(xplotvals_lefts(reach_line_ind_rgb:end), 300, 5)+mymin(-xplotvals_rights(reach_line_ind_rgb:end), 300, 5))/2) +reach_line_ind_rgb(1)-1
+
+% Flip signal, since you want to find the value which the signal switches
+% abruptely and reaches a local minimum
+flippedlefts = flip(xplotvals_lefts);
+flippedrights = flip(xplotvals_rights);
+rdy_tosit_rgb = 1+n-round((mymin(flippedlefts(1:n-turn_complete_ind_rgb),75,5) + mymin(-flippedrights(1:n-turn_complete_ind_rgb),75,5))/2)
+
+sit_rgb = mymin(yplotvals_hip_knee_absdiff(turn_complete_ind_rgb:end), 300, 10) +turn_complete_ind_rgb-1
+
+figure(40)
+plot(1:n,yplotvals_height_smooth)
+title('height of hips')
+figure(41)
+plot(1:n,zplotvals_pelvis_global_smooth)
+title('global z position of hips')
+figure(42)
+plot(1:n,xplotvals_lefts,1:n,xplotvals_rights)
+title('x position of shoulders')
+figure(43)
+plot(1:n,yplotvals_hip_knee_absdiff)
+title('difference in height of knees')
+
+% Display video at segmented times
+for val = ([stand_up_ind_rgb,reach_line_ind_rgb,turn_complete_ind_rgb,rdy_tosit_rgb,sit_rgb]-num)
+    for i = val:val+2*num
+        I = imread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number), '/frame/frame', num2str(i),'.jpg']);
+        figure(30)
+        imshow(I)
+        title([num2str(i-val-num),' and ', num2str(i)])
+        pause(ptime)
+    end
+end
+
+disp(['user stands up at ', num2str((stand_up_ind_rgb-1)/frame_rate), ' secondes'])
+disp(['user reaches three meters at ', num2str((reach_line_ind_rgb(1)-1)/frame_rate), ' secondes'])
+disp(['user completes turn at ', num2str((turn_complete_ind_rgb-1)/frame_rate), ' secondes'])
+disp(['user completes turn at ', num2str((rdy_tosit_rgb-1)/frame_rate), ' secondes'])
+disp(['user sits back down at ', num2str((sit_rgb-1)/frame_rate), ' secondes'])
+%%
+for i = 1:17
+    skel_vid_frame_new(i,:) = skel_vid_frame(i,:)+translation_frame;
+end
+disp(skel_vid_frame_new)
+disp(skel_vid_frame)
+figure(8)
+
+plotSkel3D_global(skel_vid_frame_new, 'r',xlimits,ylimits )
+%% Testing with Kinect results
+keypts_1Darr_kinect = csvread('output/data_kinect.csv')
+nk = size(keypts_1Darr_kinect,1)
+
+smoothed_rfoot = smoothdata(keypts_1Darr_kinect(:,12),'movmedian',5);
+smoothed_lfoot = smoothdata(keypts_1Darr_kinect(:,21),'movmedian',5);
+for i = 1:nk
+    % Relative positions
+    yplotvals_heightk(i) = keypts_1Darr_kinect(i,26)-(keypts_1Darr_kinect(i,11)+keypts_1Darr_kinect(i,20))/2;
+%     yplotvals_heightk(i) = keypts_1Darr_kinect(i,26);
+    xplotvals_leftsk(i) = keypts_1Darr_kinect(i,28);
+    xplotvals_rightsk(i) = keypts_1Darr_kinect(i,37);
+    yplotvals_pelvisk(i) = (smoothed_rfoot(i)-smoothed_lfoot(i));
+    yplotvals_hipsk(i) = (keypts_1Darr_kinect(i,5)+keypts_1Darr_kinect(i,14))/2;   
+    yplotvals_hip_knee_absdiffk(i) = abs(keypts_1Darr_kinect(i,5)-keypts_1Darr_kinect(i,8))+abs(keypts_1Darr_kinect(i,14)-keypts_1Darr_kinect(i,17))
+    % The z value is actually the depth of the image, it's just represented differently for the pinhole camera model 
+    % Hip gloval y pos over time
+    zplotvals_pelvis_globalk(i) = (keypts_1Darr_kinect(i,6)+keypts_1Darr_kinect(i,15))/2;
+end
+timestamps = keypts_1Darr_kinect(:,46);
+time_diff = (30-(timestamps(end)-timestamps(1))); % difference from 30 secondes
+%(since skeleton starts being tracked later in video, but total length is 30 secondes)
+time = 31/30*(timestamps-timestamps(1)+time_diff)       % For some reason video is 31 secondes long instead of 30
+
+start_frame_number = ceil(time_diff*frame_rate)
+okk = (start_frame_number+2):894
+% therefore change max time to be 31 secondes
+zplotvals_pelvis_global_smoothk = smoothdata(zplotvals_pelvis_globalk,'movmedian',5)
+yplotvals_pelvisk = smoothdata(yplotvals_pelvisk,'movmedian',5)
+
+m = 142
+stand_up_ind_k  =mymin(yplotvals_heightk(m:end), 500, 6) +m-1
+
+reach_line_ind_k = mymin(zplotvals_pelvis_global_smoothk(stand_up_ind_k:end),1750,8)+stand_up_ind_k-1
+
+turn_complete_ind_k = round((mymin(xplotvals_leftsk(reach_line_ind_k:end), 200, 5)+mymin(-xplotvals_rightsk(reach_line_ind_k:end), 250, 5))/2) +reach_line_ind_k(1)-1
+
+flippedleftsk = flip(xplotvals_leftsk);
+flippedrightsk = flip(xplotvals_rightsk);
+rdy_tosit_k = 1+n-round((mymin(-flippedleftsk(1:n-turn_complete_ind_k),100,5) + mymin(flippedrightsk(1:n-turn_complete_ind_k),50,5))/2)-start_frame_number
+
+sit_k = mymin(yplotvals_hip_knee_absdiffk(rdy_tosit_k:end), 300, 10) +rdy_tosit_k-1
+
+stand_up_ind_k = stand_up_ind_k + start_frame_number
+reach_line_ind_k = reach_line_ind_k +start_frame_number
+turn_complete_ind_k = turn_complete_ind_k+start_frame_number
+rdy_tosit_k = rdy_tosit_k + start_frame_number
+sit_k = sit_k + start_frame_number
+% 
+% figure(19)
+% plot(time,xplotvals_leftsk)
+% figure(20)
+% plot(time,xplotvals_rightsk)
+% figure(21)
+% plot(time,yplotvals_heightk)
+% 
+% figure(22)
+% plot(time,zplotvals_pelvis_globalk)
+% 
+% figure(23)
+% plot(time,yplotvals_heelsk)
+
+figure(19)
+plot(okk,xplotvals_leftsk)
+figure(20)
+plot(okk,xplotvals_rightsk)
+figure(21)
+plot(okk,yplotvals_heightk)
+
+figure(22)
+plot(okk,zplotvals_pelvis_globalk)
+
+% figure(23)
+% plot(okk,yplotvals_heelsk)
+
+
+figure(24)
+plot(okk,yplotvals_pelvisk)
+
+figure(25)
+plot(okk,yplotvals_hip_knee_absdiffk) 
+
+figure(26)
+plot(okk(2:end),abs(diff(yplotvals_hip_knee_absdiffk))) 
+
+figure(27)
+plot(okk,yplotvals_heightk) 
+
+% Display video at segmented times
+for val = ([stand_up_ind_k,reach_line_ind_k,turn_complete_ind_k,rdy_tosit_k,sit_k]-num)
+    for i = val:val+2*num
+        I = imread(['output/subjects/subject',num2str(subject_id), '/trial', num2str(trial_number), '/frame/frame', num2str(i),'.jpg']);
+        figure(30)
+        imshow(I)
+        title([num2str(i-val-num),' and ', num2str(i)])
+        pause(ptime)
+    end
+end
+
+%%
+diff_stand = stand_up_ind_rgb - stand_up_ind_k;
+diff_reachend = reach_line_ind_rgb - reach_line_ind_k;
+diff_turncomplete = turn_complete_ind_rgb - turn_complete_ind_k;
+diff_rdy_sit = rdy_tosit_rgb - rdy_tosit_k;
+diff_sit = sit_rgb - sit_k;
+
+disp(['diff_stand = ', num2str(diff_stand)])
+disp(['diff_reachend = ', num2str(diff_reachend)])
+disp(['diff_turncomplete = ', num2str(diff_turncomplete)])
+disp(['diff_rdy_sit = ', num2str(diff_rdy_sit)])
+disp(['diff_sit = ', num2str(diff_sit)])
+
+%% Coordinates are in (x,z,y) (Looks like z coordinate is inverted during plotting
+% Where positive x = ->, y = out of board, z = down (before inverting
+% positive z is down just like regular image)
+
+% 1 = Pelvis
+% 2 = right Hip
+% 3 = right Knee
+% 4 = right Ankle
+% 5 = left Hip
+% 6 = left Knee
+% 7 = left Ankle
+% 8 = Spine (between neck and pelvis)
+% 9 = Start of Neck (or nose?)
+% 10 = Mid Neck
+% 11 = Head
+% 12 = left Shoulder
+% 13 = left Elbow
+% 14 = left Hand
+% 15 = right Shoulder
+% 16 = right Elbow
+% 17 = right Hand
+
+ ind = [1     2     3     4     7     8     9    13    14    15    16    18    19    20    26   27    28];
+buff_large = zeros(32, 3);
+buff_large(ind, :) = pose3D;
+
+pose3D = buff_large';
+
+hold on;
+order = [1 3 2];
+figure(3)
+
+val = (pose3D{i})'
+plot3(val(order(1), [1 13]), val(order(2), [1 13]), -val(order(3), [1 13]), ['r' '-'], 'LineWidth',5);
+
+%%
+
+f = 3100 % Focal lenth of camera
+
+indval = 1
+vidpos3D = frame_keypts3D{indval};
+keypts2D = frame_keypts2D{indval};
+
+m = 10;
+pxyz_older = zeros(3,m);
+
+% % 1) Pelvis
+pxyz_older(:,1) = [vidpos3D(1,1);vidpos3D(1,2);-vidpos3D(1,3)];
+% take pelvis as mean of left and right hip
+
+% % 1) right hip
+% pxy{1} = [vidpos3D(2,1);vidpos3D(2,2)];
+% % take pelvis as mean of left and right hip
+% kxy{1} = [keypts2D(5);keypts2D(6)];
+
+% 2) Left Knee
+pxyz_older(:,2) = [vidpos3D(6,1);vidpos3D(6,2);-vidpos3D(6,3)];
+
+% 3) Left Ankle
+pxyz_older(:,3) = [vidpos3D(7,1);vidpos3D(7,2);-vidpos3D(7,3)];
+
+% 4) Right Knee
+pxyz_older(:,4) = [vidpos3D(3,1);vidpos3D(3,2);-vidpos3D(3,3)];
+
+% 5) Right Ankle
+pxyz_older(:,5) = [vidpos3D(4,1);vidpos3D(4,2);-vidpos3D(4,3)];
+
+% 6) Nose
+% try nose as mid neck
+pxyz_older(:,6) = [vidpos3D(10,1);vidpos3D(10,2);-vidpos3D(10,3)];
+
+% 7) Right Shoulder
+pxyz_older(:,7)= [vidpos3D(15,1);vidpos3D(15,2);-vidpos3D(15,3)];
+
+% 8) Right Wrist
+pxyz_older(:,8)= [vidpos3D(17,1);vidpos3D(17,2);-vidpos3D(17,3)];
+
+% 9) Left Shoulder
+pxyz_older(:,9)= [vidpos3D(12,1);vidpos3D(12,2);-vidpos3D(12,3)];
+
+% 10) Left Wrist
+pxyz_older(:,10) = [vidpos3D(14,1);vidpos3D(14,2);-vidpos3D(14,3)];
+
+indval = 2
+vidpos3D = frame_keypts3D{indval}
+keypts2D = frame_keypts2D{indval};
+
+m = 10;
+pxyz_old = zeros(3,m);
+
+% % 1) Pelvis
+pxyz_old(:,1) = [vidpos3D(1,1);vidpos3D(1,2);-vidpos3D(1,3)];
+% take pelvis as mean of left and right hip
+
+% % 1) right hip
+% pxy{1} = [vidpos3D(2,1);vidpos3D(2,2)];
+% % take pelvis as mean of left and right hip
+% kxy{1} = [keypts2D(5);keypts2D(6)];
+
+% 2) Left Knee
+pxyz_old(:,2) = [vidpos3D(6,1);vidpos3D(6,2);-vidpos3D(6,3)];
+
+% 3) Left Ankle
+pxyz_old(:,3) = [vidpos3D(7,1);vidpos3D(7,2);-vidpos3D(7,3)];
+
+% 4) Right Knee
+pxyz_old(:,4) = [vidpos3D(3,1);vidpos3D(3,2);-vidpos3D(3,3)];
+
+% 5) Right Ankle
+pxyz_old(:,5) = [vidpos3D(4,1);vidpos3D(4,2);-vidpos3D(4,3)];
+
+% 6) Nose
+% try nose as mid neck
+pxyz_old(:,6) = [vidpos3D(10,1);vidpos3D(10,2);-vidpos3D(10,3)];
+
+% 7) Right Shoulder
+pxyz_old(:,7)= [vidpos3D(15,1);vidpos3D(15,2);-vidpos3D(15,3)];
+
+% 8) Right Wrist
+pxyz_old(:,8)= [vidpos3D(17,1);vidpos3D(17,2);-vidpos3D(17,3)];
+
+% 9) Left Shoulder
+pxyz_old(:,9)= [vidpos3D(12,1);vidpos3D(12,2);-vidpos3D(12,3)];
+
+% 10) Left Wrist
+pxyz_old(:,10) = [vidpos3D(14,1);vidpos3D(14,2);-vidpos3D(14,3)];
+
+
+indval = 100
+
+
+i = 1;
+for indval = 3:40
+    vidpos3D = frame_keypts3D{indval};
+    keypts2D = frame_keypts2D{indval};
+    m = 10;
+    pxyz = zeros(3,m);
+    kxy = zeros(2,m);
+
+    % % 1) Pelvis
+    pxyz(:,1) = [vidpos3D(1,1);vidpos3D(1,2);-vidpos3D(1,3)];
+    % take pelvis as mean of left and right hip
+    kxy(:,1) = [(keypts2D(3)+keypts2D(5))/2;(keypts2D(4)+keypts2D(6))/2];
+
+    % % 1) right hip
+    % pxy{1} = [vidpos3D(2,1);vidpos3D(2,2)];
+    % % take pelvis as mean of left and right hip
+    % kxy{1} = [keypts2D(5);keypts2D(6)];
+
+    % 2) Left Knee
+    pxyz(:,2) = [vidpos3D(6,1);vidpos3D(6,2);-vidpos3D(6,3)];
+    kxy(:,2) = [keypts2D(15);keypts2D(16)];
+
+    % 3) Left Ankle
+    pxyz(:,3) = [vidpos3D(7,1);vidpos3D(7,2);-vidpos3D(7,3)];
+    kxy(:,3) = [keypts2D(19);keypts2D(20)];
+
+    % 4) Right Knee
+    pxyz(:,4) = [vidpos3D(3,1);vidpos3D(3,2);-vidpos3D(3,3)];
+    kxy(:,4) = [keypts2D(17);keypts2D(18)];
+
+    % 5) Right Ankle
+    pxyz(:,5) = [vidpos3D(4,1);vidpos3D(4,2);-vidpos3D(4,3)];
+    kxy(:,5)= [keypts2D(21);keypts2D(22)];
+
+    % 6) Nose
+    % try nose as mid neck
+    pxyz(:,6) = [vidpos3D(10,1);vidpos3D(10,2);-vidpos3D(10,3)];
+    kxy(:,6)= [keypts2D(1);keypts2D(2)];
+
+    % 7) Right Shoulder
+    pxyz(:,7)= [vidpos3D(15,1);vidpos3D(15,2);-vidpos3D(15,3)];
+    kxy(:,7)= [keypts2D(13);keypts2D(14)];
+
+    % 8) Right Wrist
+    pxyz(:,8)= [vidpos3D(17,1);vidpos3D(17,2);-vidpos3D(17,3)];
+    kxy(:,8) = [keypts2D(9);keypts2D(10)];
+
+    % 9) Left Shoulder
+    pxyz(:,9)= [vidpos3D(12,1);vidpos3D(12,2);-vidpos3D(12,3)];
+    kxy(:,9)= [keypts2D(11);keypts2D(12)];
+
+    % 10) Left Wrist
+    pxyz(:,10) = [vidpos3D(14,1);vidpos3D(14,2);-vidpos3D(14,3)];
+    kxy(:,10)= [keypts2D(7);keypts2D(8)];
+
+    old_vel = pxyz_old - pxyz_older;
+
+    x0 = zeros(3,11);
+    x0(:,1:10)=pxyz;
+    x0(:,11) = pxyz(:,1);
+
+    fun=@(x)TotalError(x,pxyz,kxy,pxyz_old,old_vel);
+
+
+    options.Algorithm='levenberg-marquardt';
+    x=lsqnonlin(fun,x0,[],[],options)
+
+    pose_val{i} = x(:,1:10);
+    pxyz_older = pxyz_old;
+    pxyz_old = pose_val{i};
+    old_vel = pxyz_old-pxyz_older;
+    
+    avgoffset = mean(pxyz'-pose_val{i}');
+    
+    for k = 1:17
+        pose_final{i}(k,:) = frame_keypts3D{indval}(k,:) + avgoffset;
+    end
+    i = i+1;
+end
+
+% close all
+for i = 1:38
+    maxvalx(i) = max(pose_final{i}(:,1))
+    minvalx(i) = min(pose_final{i}(:,1))
+    maxvaly(i) = max(pose_final{i}(:,3))
+    minvaly(i) = min(pose_final{i}(:,3))
+    maxvalz(i) = max(pose_final{i}(:,2))
+    minvalz(i) = min(pose_final{i}(:,2))
+    
+end
+minvalx_tot = min(minvalx)
+maxvalx_tot = max(maxvalx)
+minvaly_tot = min(minvaly)
+maxvaly_tot = max(maxvaly)
+minvalz_tot = min(minvalz)
+maxvalz_tot = max(maxvalz)
+
+
+for i = 1:38
+  plotSkel3D_global(pose_final{i}, 'r',[minvalx_tot,maxvalx_tot],[minvaly_tot,maxvaly_tot],[minvalz_tot,maxvalz_tot]);
+  pause(0.3)
+end
